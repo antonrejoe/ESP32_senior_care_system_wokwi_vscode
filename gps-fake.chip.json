@@ -1,0 +1,5 @@
+{
+  "name": "GPS Fake",
+  "author": "Anton Rejoe",
+  "pins": ["RX", "TX", "GND", "VCC"]
+}

@@ -1,0 +1,48 @@
+{
+  "name": "GPS Simulation Project",
+  "author": "Anton Rejoe",
+  "description": "A project simulating a GPS module using Wokwi.",
+  "components": {
+    "gps": {
+      "type": "custom-chip",
+      "name": "GPS Fake",
+      "pins": {
+        "TX": "RX",
+        "RX": "TX",
+        "GND": "GND",
+        "VCC": "VCC"
+      }
+    },
+    "microcontroller": {
+      "type": "esp32",
+      "pins": {
+        "TX": "TX",
+        "RX": "RX",
+        "GND": "GND",
+        "VCC": "VCC"
+      }
+    }
+  },
+  "connections": [
+    {
+      "from": "gps.TX",
+      "to": "microcontroller.RX"
+    },
+    {
+      "from": "gps.RX",
+      "to": "microcontroller.TX"
+    },
+    {
+      "from": "gps.GND",
+      "to": "microcontroller.GND"
+    },
+    {
+      "from": "gps.VCC",
+      "to": "microcontroller.VCC"
+    }
+  ],
+  "files": {
+    "main.cpp": "path/to/your/main.cpp",
+    "gps_chip.json": "path/to/your/gps_chip.json"
+  }
+}

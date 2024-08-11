@@ -4,14 +4,26 @@
 #include <math.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
-#include "Audio.h"
+#include "Audio.h"  // Include the Audio library for I2S audio playback
+
+#include "NMEA.h"
+
+#define LEN(arr) ((int)(sizeof(arr) / sizeof(arr)[0]))
+
+union {
+  char bytes[4];
+  float valor;
+} velocidadeGPS;
+
+float latitude;
+float longitude;
+
+// Remove conflicting GPS object declaration
+TinyGPSPlus gps;  // Use TinyGPSPlus for GPS handling
 
 // GPS module connected to RX2 (16) and TX2 (17)
 static const int RXPin = 16, TXPin = 17;
 static const uint32_t GPSBaud = 9600;
-
-// Create a TinyGPS++ object
-TinyGPSPlus gps;
 
 // Create a hardware serial object
 HardwareSerial ss(2);
@@ -35,20 +47,6 @@ unsigned long previousReminderMillis = 0;
 // Initialize the audio object
 Audio audio;
 
-// Buzzer pin
-const int buzzerPin = 13; // Replace with the correct GPIO pin for the buzzer
-
-// Switch pin
-const int switchPin = 12; // Replace with the correct GPIO pin for the switch
-
-
-#define LED_BUILTIN 2
-
-
-// Mode switch
-enum Mode { BUZZER, AUDIO };
-Mode currentMode = AUDIO; // Default mode
-
 struct HttpResponse {
     int status;
     String body;
@@ -57,7 +55,7 @@ struct HttpResponse {
 
 HttpResponse HttpPost(const String& url, const String& payload, bool followRedirects) {
     HttpResponse response;
-    WiFiClient client;
+    WiFiClient client;  // Use WiFiClient for HTTP requests
     HTTPClient http;
     
     http.setFollowRedirects(followRedirects ? HTTPC_FORCE_FOLLOW_REDIRECTS : HTTPC_DISABLE_FOLLOW_REDIRECTS);
@@ -95,7 +93,7 @@ HttpResponse HttpGet(const String& url) {
 }
 
 String parseReminder(String payload) {
-    StaticJsonDocument<200> doc;
+    DynamicJsonDocument doc(200);
 
     DeserializationError error = deserializeJson(doc, payload);
 
@@ -105,59 +103,33 @@ String parseReminder(String payload) {
         return "";
     }
 
-    // Check if the parsed document has the correct structure
-    if (!doc.containsKey("name")) {
-        Serial.println("Reminder JSON does not contain 'name'.");
-        return "";  // Return an empty string if the expected key is not present
-    }
-
-    // Extract the "name" field from the JSON object
-    String name = doc["name"].as<String>();
+    JsonObject reminder = doc[0];
+    String name = reminder["name"];
 
     return name;
 }
 
-void blinkLED(int times, int delayTime) {
-    for (int i = 0; i < times; i++) {
-        digitalWrite(LED_BUILTIN, HIGH); // Turn the LED on
-        delay(delayTime);
-        digitalWrite(LED_BUILTIN, LOW);  // Turn the LED off
-        delay(delayTime);
-    }
-}
-
-unsigned long getCurrentTime() {
-    time_t now;
-    time(&now);
-    return now;
-}
-
-
 void playReminder(String reminder) {
-    if (reminder.isEmpty()) {
-        Serial.println("No valid reminder found.");
-        return;
-    }
-
-    Serial.println("Reminder: " + reminder);
-
-    // Blink the LED based on the reminder
-    if (reminder ) {
-    //if (true){
-        blinkLED(3, 500);  // Blink the LED 3 times with a 500 ms delay
+    if (reminder == "Take your medicine") {
+        audio.connecttoFS(SPIFFS, "/reminder_take_medicine.wav");
     } else if (reminder == "Drink water") {
-        blinkLED(2, 500);  // Blink the LED 2 times with a 500 ms delay
+        audio.connecttoFS(SPIFFS, "/reminder_drink_water.wav");
     } else {
         Serial.println("Unknown reminder: " + reminder);
     }
 }
 
-void stopReminder() {
-    if (currentMode == AUDIO) {
-        audio.stopSong(); // Method to stop the audio playback
-    } else if (currentMode == BUZZER) {
-        noTone(buzzerPin); // Stop the buzzer sound
-    }
+void convertCoordinatesToCartesian(float latitude, float longitude) {
+  float latRadius = latitude  * (PI) / 180;  // Convert from Degrees to Radians
+  float lonRadius = longitude * (PI) / 180;
+
+  int earthRadius = 6371; // Radius in km
+
+  float posX = earthRadius * cos(latRadius) * cos(lonRadius);
+  float posY = earthRadius * cos(latRadius) * sin(lonRadius);
+
+  Serial.print("        X: ");  Serial.println(posX);
+  Serial.print("        Y: ");  Serial.println(posY);
 }
 
 void setup() {
@@ -177,15 +149,6 @@ void setup() {
     // Initialize the audio library and speaker
     audio.setPinout(26, 25, 22);  // Set the correct I2S pins for your setup
     SPIFFS.begin(true);  // Start SPIFFS filesystem for audio files
-
-    // Initialize buzzer pin
-    pinMode(buzzerPin, OUTPUT);
-
-    // Initialize switch pin
-    pinMode(switchPin, INPUT_PULLUP); // Assuming active low switch
-
-    // Initialize the built-in LED pin
-    pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void loop() {
@@ -199,9 +162,9 @@ void loop() {
     if (currentMillis - previousGpsMillis >= gpsInterval) {
         previousGpsMillis = currentMillis;
 
-        if (true) { // Replace with gps.location.isValid() if using real GPS
-            float latitude = 36.778259;
-            float longitude = -119.417931;
+        if (gps.location.isValid()) {
+            latitude = gps.location.lat();
+            longitude = gps.location.lng();
 
             Serial.print("Latitude= ");
             Serial.print(latitude, 6);
@@ -229,37 +192,25 @@ void loop() {
         }
     }
 
-    // Check the switch state to determine whether to process reminders
-    bool switchState = digitalRead(switchPin) == HIGH; // Assuming LOW means the switch is pressed
-
     // Check if it's time to fetch reminders
     if (currentMillis - previousReminderMillis >= reminderInterval) {
         previousReminderMillis = currentMillis;
 
         if (WiFi.status() == WL_CONNECTED) {
-            if (switchState) {
-                HttpResponse httpResponse = HttpGet(reminderServerName);
+            HttpResponse httpResponse = HttpGet(reminderServerName);
+            
+            if (httpResponse.status > 0) {
+                Serial.println(httpResponse.status);
+                Serial.println(httpResponse.body);
                 
-                if (httpResponse.status > 0) {
-                    Serial.println(httpResponse.status);
-                    Serial.println(httpResponse.body);
-                    
-                    String reminder = parseReminder(httpResponse.body);
-                    if (reminder.length() > 0) {
-                        stopReminder(); // Stop any previous reminder
-                        playReminder(reminder);
-                    } else {
-                        Serial.println("No reminders found.");
-                    }
-                } else {
-                    Serial.print("Error on fetching reminders: ");
-                    Serial.println(httpResponse.status);
+                String reminder = parseReminder(httpResponse.body);
+                if (reminder.length() > 0) {
+                    playReminder(reminder);
                 }
             } else {
-                Serial.println("Reminder processing is turned off.");
+                Serial.print("Error on fetching reminders: ");
+                Serial.println(httpResponse.status);
             }
-        } else {
-            Serial.println("WiFi not connected.");
         }
     }
 }

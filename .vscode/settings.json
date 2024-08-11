@@ -1,0 +1,21 @@
+{
+  "files.associations": {
+    "array": "cpp",
+    "deque": "cpp",
+    "string": "cpp",
+    "unordered_map": "cpp",
+    "unordered_set": "cpp",
+    "vector": "cpp",
+    "string_view": "cpp",
+    "initializer_list": "cpp",
+    "stdio.h": "c",
+    "string.h": "c",
+    "stdlib.h": "c",
+    "wokwi-api.h": "c",
+    "audio.h": "c",
+    "arduinojson.h": "c",
+    "hardwareserial.h": "c",
+    "tinygps++.h": "c",
+    "httpclient.h": "c"
+  }
+}

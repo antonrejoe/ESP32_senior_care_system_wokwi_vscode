@@ -1,0 +1,6 @@
+{
+    "configuration": "PartitionScheme=minimal,FlashMode=qio,FlashFreq=60,FlashSize=2M,UploadSpeed=921600,DebugLevel=none,EraseFlash=none",
+    "board": "esp32:esp32:esp32c2",
+    "programmer": "esptool",
+    "sketch": "src/esp32-http-server.ino"
+}

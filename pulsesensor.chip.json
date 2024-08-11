@@ -1,0 +1,14 @@
+{
+  "name": "pulse-sensor",
+  "author": "ProCoding Whitehat JR",
+  "pins": ["GND", "VCC", "", "OUT0", "", "", ""],
+  "controls": [
+    {
+      "id": "pulseValue",
+      "label": "Heart Rate",
+      "type": "slider",
+      "min": 0,
+      "max": 675
+    }
+  ]
+}

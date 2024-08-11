@@ -1,0 +1,6 @@
+{
+  "name": "gps-neo6m",
+  "author": "Anton Rejoe",
+  "pins": ["VCC", "GND", "RX", "TX"],
+  "controls": []
+}
